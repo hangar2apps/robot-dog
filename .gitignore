@@ -1,0 +1,20 @@
+# --- PlatformIO ---
+.pio/
+robodog-p1/.pio/
+*.bin
+*.elf
+
+# --- Python / virtualenv (sniffer + recon tooling) ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# --- Secrets (WiFi creds, API keys) ---
+**/secrets.h
+.env
+
+# --- Editor / OS cruft ---
+.vscode/
+.DS_Store
+*.swp
