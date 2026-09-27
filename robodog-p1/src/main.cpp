@@ -27,8 +27,8 @@
   #include "secrets.h"
 #else
   #warning "secrets.h not found - using placeholder WiFi creds; copy secrets.h.example to secrets.h"
-  #define WIFI_SSID "YOUR_WIFI_NAME"
-  #define WIFI_PASS "YOUR_WIFI_PASSWORD"
+  #define WIFI_SSID 
+  #define WIFI_PASS 
 #endif
 
 // ---------------- USER CONFIG ----------------
