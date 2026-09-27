@@ -42,12 +42,13 @@ const uint32_t CMD_TIMEOUT_MS       = 600;      // stop motors if no command wit
 // ---- Motor pin map (ESP32 GPIO -> DRV8833 inputs) ----
 // DRV8833 #1 = LEFT side, DRV8833 #2 = RIGHT side.
 // Each motor uses one channel (IN1/IN2). PWM on one pin = speed; which pin = direction.
-struct Motor { uint8_t in1; uint8_t in2; };
+// Each motor: 2 pins + 2 LEDC channels (channels only used by the 2.x core API).
+struct Motor { uint8_t in1; uint8_t in2; uint8_t ch1; uint8_t ch2; };
 
-Motor LF = {25, 26};   // Left-Front   -> DRV8833 #1 AIN1/AIN2
-Motor LR = {27, 14};   // Left-Rear    -> DRV8833 #1 BIN1/BIN2
-Motor RF = {32, 33};   // Right-Front  -> DRV8833 #2 AIN1/AIN2
-Motor RR = {13, 23};   // Right-Rear   -> DRV8833 #2 BIN1/BIN2
+Motor LF = {25, 26, 0, 1};   // Left-Front   -> DRV8833 #1 AIN1/AIN2
+Motor LR = {27, 14, 2, 3};   // Left-Rear    -> DRV8833 #1 BIN1/BIN2
+Motor RF = {32, 33, 4, 5};   // Right-Front  -> DRV8833 #2 AIN1/AIN2
+Motor RR = {13, 23, 6, 7};   // Right-Rear   -> DRV8833 #2 BIN1/BIN2
 
 // PWM config
 const int PWM_FREQ = 20000;   // 20 kHz = silent (above hearing), good for small motors
@@ -56,23 +57,40 @@ const int PWM_RES  = 8;       // 8-bit -> duty 0..255
 WebServer server(80);
 uint32_t lastCmdMs = 0;
 
-// Attach both pins of a motor to LEDC PWM channels
+// LEDC PWM helpers — work on both ESP32 Arduino core 3.x (pin-based) and 2.x (channel-based).
+static inline void pwmSetup(uint8_t pin, uint8_t ch) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  (void)ch; ledcAttach(pin, PWM_FREQ, PWM_RES);
+#else
+  ledcSetup(ch, PWM_FREQ, PWM_RES);
+  ledcAttachPin(pin, ch);
+#endif
+}
+static inline void pwmWrite(uint8_t pin, uint8_t ch, uint32_t duty) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  (void)ch; ledcWrite(pin, duty);
+#else
+  (void)pin; ledcWrite(ch, duty);
+#endif
+}
+
+// Attach both pins of a motor to LEDC PWM
 void setupMotor(const Motor& m) {
-  ledcAttach(m.in1, PWM_FREQ, PWM_RES);
-  ledcAttach(m.in2, PWM_FREQ, PWM_RES);
-  ledcWrite(m.in1, 0);
-  ledcWrite(m.in2, 0);
+  pwmSetup(m.in1, m.ch1);
+  pwmSetup(m.in2, m.ch2);
+  pwmWrite(m.in1, m.ch1, 0);
+  pwmWrite(m.in2, m.ch2, 0);
 }
 
 // speed: -255..255. Positive = forward, negative = reverse, 0 = coast.
 void driveMotor(const Motor& m, int speed) {
   speed = constrain(speed, -255, 255);
   if (speed >= 0) {
-    ledcWrite(m.in1, speed);
-    ledcWrite(m.in2, 0);
+    pwmWrite(m.in1, m.ch1, speed);
+    pwmWrite(m.in2, m.ch2, 0);
   } else {
-    ledcWrite(m.in1, 0);
-    ledcWrite(m.in2, -speed);
+    pwmWrite(m.in1, m.ch1, 0);
+    pwmWrite(m.in2, m.ch2, -speed);
   }
 }
 
