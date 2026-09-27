@@ -1,26 +1,45 @@
-dog UUID - 4D97497A-6F15-FB7E-A434-0799C5BA535E
+# robot-dog
 
+Turning a cheap app/RC "smart robot dog" toy into an autonomous robot — first by reverse-engineering it, now by giving it a new brain.
 
-All four, sequenced. Here's the project. Each phase gates the next — don't skip.
+## The story so far
 
-Phase 0 — Passive recon (do first, non-destructive)
-Photograph the FCC ID (molded/printed on the toy) → look it up at fcc.io/id/[ID]. FCC filings include internal photos + block diagrams. Free teardown = you'll often ID the BLE chip and radio before opening anything. Tells you if custom firmware is even feasible (ESP32/Nordic = yes; masked-ROM no-name SoC = probably not).
+**Phase A — the hack (done, archived in [`recon/`](recon/)).**
+Reverse-engineered the stock toy: teardown, BLE recon, and firmware/debug analysis. Key finding — the vendor app talks to the dog over an **L2CAP dynamic channel (not standard GATT/ATT)**, which is why phone HCI snooping couldn't cleanly capture commands. Full writeup mapped to OWASP IoT/FSTM is in [`recon/assessment.md`](recon/assessment.md); the blow-by-blow is in [`recon/tried-so-far.md`](recon/tried-so-far.md).
 
-Phase 1 — BLE enumeration
-nRF Connect app for the quick look, but you'll want programmatic access anyway. Starter script below scans + dumps every service/characteristic/property. Run it, drive the dog with the official app in the background, note which characteristic is WRITE/WRITE_NO_RESPONSE (command channel) vs NOTIFY (telemetry).
+**Phase B — the brain transplant (active).**
+Rather than keep fighting the closed radio, replace the stock control board with an **ESP32** and drive the hardware directly. Goal: **autonomy** — a dog that wanders and avoids obstacles on its own, with a manual override.
 
-Phase 2 — Protocol capture
-Android HCI snoop → Wireshark btatt filter → map every button to its payload bytes. This is the actual reverse-engineering. Watch for: a checksum byte (often last byte = XOR or sum of prior), a handshake packet on connect, a keepalive (dog disconnects/ignores you without it). Log battery/sensor notify packets separately.
+## Hardware
 
-Phase 3 — Your own controller
-bleak for a Python/CLI or FastAPI wrapper; Web Bluetooth if you want a React control pad in-browser (Chrome only, no app/install — good demo). Once Phase 2 gives you the byte maps this is trivial.
+- 4× brushed DC gear-motors (skid/tank steer — left pair + right pair), speaker, 3.7 V Li-ion cell (~1200 mAh)
+- **ESP32** (external-antenna module) — new brain, WiFi + BLE
+- **2× DRV8833** dual H-bridge — one per side (low dropout, good for 3.7 V)
+- **HC-SR04** ultrasonic — front obstacle sensing (Phase 2; needs a divider on Echo → 3.3 V)
+- **MT3608** boost 3.7 V→5 V — powers the ESP32 for untethered running (Phase 2)
 
-Phase 4 — Custom firmware (risk: brick)
-Only if Phase 0 shows a flashable MCU. Crack the case, find the debug/UART pads or SWD header, dump original firmware first (esptool.py read_flash for ESP32) so you can restore. Then flash your own. This voids everything and can permanently kill it — do it last, after you've extracted all the value from Phases 1–3.
+## Build phases
 
-Starter recon script:
-Run scan first with the dog on but not connected to the phone app (BLE only allows one central — the app will hog it). Strongest RSSI is almost certainly your dog. Then --connect <addr> --listen.
-Two things determine everything downstream:
+| Phase | What | Status |
+|---|---|---|
+| **P1** | ESP32 drives the 4 motors; phone web control pad + JSON API | 🔨 in progress → [`robodog-p1/`](robodog-p1/) |
+| **P2** | HC-SR04 + on-device reactive wander/avoid (fully offline); MT3608 for untethered power | planned |
+| **P3** | Off-board agent (`rodrigo`, Claude tool-use) sets high-level intent via the P1 JSON API | planned |
 
-Does it even show up as BLE? If nRF Connect / this script sees nothing but the phone controls it fine, it might be classic Bluetooth SPP or 2.4GHz proprietary (some cheap ones use a dongle-style RF chip) — different toolchain. Tell me what scan returns.
-FCC ID from the label — send it and I'll pull the internal photos to ID the chip before you open it.
+Architecture: **reactive reflexes live on the ESP32** (always-on, safe if WiFi/agent drops); the **agent sets intent** over the network. One JSON API serves both the web pad and the agent.
+
+## Quickstart (P1)
+
+```bash
+cd robodog-p1
+cp include/secrets.h.example include/secrets.h   # add your WiFi
+# open in VS Code + PlatformIO, Upload, then open the IP the serial monitor prints
+```
+Full wiring + flashing steps: [`robodog-p1/README.md`](robodog-p1/README.md).
+
+## Layout
+
+```
+robodog-p1/   active ESP32 firmware (PlatformIO)
+recon/        Phase A — the reverse-engineering work (assessment, recon scripts, log)
+```
