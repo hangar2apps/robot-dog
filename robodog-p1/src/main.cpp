@@ -21,10 +21,17 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
-// ---------------- USER CONFIG ----------------
-const char* WIFI_SSID = "YOUR_WIFI_NAME";       // <-- put your home WiFi here
-const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";   // <-- and password here
+// WiFi credentials live in include/secrets.h (gitignored).
+// Copy include/secrets.h.example -> include/secrets.h and fill in your values.
+#if __has_include("secrets.h")
+  #include "secrets.h"
+#else
+  #warning "secrets.h not found - using placeholder WiFi creds; copy secrets.h.example to secrets.h"
+  #define WIFI_SSID "YOUR_WIFI_NAME"
+  #define WIFI_PASS "YOUR_WIFI_PASSWORD"
+#endif
 
+// ---------------- USER CONFIG ----------------
 const char* AP_SSID   = "RoboDog-AP";           // fallback network name
 const char* AP_PASS   = "robodog123";           // >= 8 chars
 
