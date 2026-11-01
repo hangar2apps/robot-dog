@@ -50,6 +50,10 @@ Motor LR = {27, 14, 2, 3};   // Left-Rear    -> DRV8833 #1 BIN1/BIN2
 Motor RF = {32, 33, 4, 5};   // Right-Front  -> DRV8833 #2 AIN1/AIN2
 Motor RR = {13, 23, 6, 7};   // Right-Rear   -> DRV8833 #2 BIN1/BIN2
 
+// Set to 1 to run a motor self-test on boot (each motor forward+reverse, one at a time,
+// with serial prints). Set back to 0 for normal use. Normal web control still works after.
+#define SELFTEST 1
+
 // PWM config
 const int PWM_FREQ = 20000;   // 20 kHz = silent (above hearing), good for small motors
 const int PWM_RES  = 8;       // 8-bit -> duty 0..255
@@ -111,6 +115,25 @@ void stopAll() {
   driveMotor(RF, 0); driveMotor(RR, 0);
   lastLeft = lastRight = 0;
 }
+
+#if SELFTEST
+// Drive one motor forward then reverse, ~1s each, so you can SEE which leg responds.
+void testOne(const char* name, const Motor& m) {
+  Serial.printf(">> %s : FORWARD\n", name);
+  driveMotor(m, 200); delay(1200); driveMotor(m, 0); delay(500);
+  Serial.printf(">> %s : REVERSE\n", name);
+  driveMotor(m, -200); delay(1200); driveMotor(m, 0); delay(800);
+}
+void selfTest() {
+  Serial.println("===== MOTOR SELF-TEST — watch which leg moves for each line =====");
+  testOne("LF  (Left-Front   -> DRV#1 OUT1/2)", LF);
+  testOne("LR  (Left-Rear    -> DRV#1 OUT3/4)", LR);
+  testOne("RF  (Right-Front  -> DRV#2 OUT1/2)", RF);
+  testOne("RR  (Right-Rear   -> DRV#2 OUT3/4)", RR);
+  stopAll();
+  Serial.println("===== self-test done; normal web control active =====");
+}
+#endif
 
 // ---------------- Web control pad ----------------
 const char INDEX_HTML[] PROGMEM = R"HTML(
@@ -219,6 +242,11 @@ void setup() {
   server.on("/state", HTTP_GET, handleState);
   server.begin();
   Serial.println("HTTP server started.");
+
+#if SELFTEST
+  delay(500);
+  selfTest();
+#endif
 }
 
 void loop() {
