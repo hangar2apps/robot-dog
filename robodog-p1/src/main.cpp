@@ -130,8 +130,15 @@ void selfTest() {
   testOne("LR  (Left-Rear    -> DRV#1 OUT3/4)", LR);
   testOne("RF  (Right-Front  -> DRV#2 OUT1/2)", RF);
   testOne("RR  (Right-Rear   -> DRV#2 OUT3/4)", RR);
-  stopAll();
-  Serial.println("===== self-test done; normal web control active =====");
+  // Then HOLD everything forward forever so you can meter pins at leisure.
+  Serial.println("===== HOLDING ALL MOTORS FORWARD — meter pins now (Ctrl+reset to stop) =====");
+  Serial.println("  Expect, referenced to EACH board's OWN GND pin:");
+  Serial.println("   VCC=~3.7V  EEP=~3.3V  one IN of each pair=~3.3V  OUT1->OUT2=~3.7V");
+  for (;;) {
+    driveMotor(LF, 200); driveMotor(LR, 200);
+    driveMotor(RF, 200); driveMotor(RR, 200);
+    delay(250);
+  }
 }
 #endif
 
